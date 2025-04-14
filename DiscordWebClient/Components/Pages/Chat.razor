@@ -1,0 +1,300 @@
+﻿@page "/chat"
+@inject NavigationManager NavigationManager
+@using Microsoft.AspNetCore.SignalR.Client;
+@using System.Net.Http.Headers
+@using DiscordDomain.Models
+@attribute [StreamRendering]
+@rendermode InteractiveServer
+
+
+    <section class="gradient-custom">
+        <div class="container py-5">
+
+            <div class="row">
+
+                <div class="col-md-6 col-lg-5 col-xl-5 mb-4 mb-md-0">
+
+                    <h5 class="font-weight-bold mb-3 text-center text-white">Member</h5>
+
+                    <div class="card mask-custom">
+                        <div class="card-body">
+                        <div class="chat-container">
+                            <ul class="list-unstyled mb-0">
+                            @if(chats != null)
+                            {
+                                @foreach (var item in chats)
+                                {
+                                    <li class="p-2 border-bottom" style="border-bottom: 1px solid rgba(255,255,255,.3) !important;">
+                                        <a class="d-flex justify-content-between link-light" @onclick="() => FocusChange(item)">
+                                            <div class="d-flex flex-row">
+                                                <img src="@item.PicturePath" alt="avatar"
+                                                     class="rounded-circle d-flex align-self-center me-3 shadow-1-strong" width="60">
+                                                <div class="pt-1">
+                                                    <p class="fw-bold mb-0 text-dark" style="">@item.Name</p>
+                                                    @if(item.Messages != null && item.Messages.Count > 0)
+                                                    {
+                                                        <p class="small text-dark">@item.Messages.Last().TextMessage</p>
+                                                    }
+                                                    else
+                                                    {
+                                                        <p class="small text-dark">Начните чат</p>
+                                                    }
+                                                </div>
+                                            </div>
+                                        </a>
+                                    </li>
+                                }
+                            }
+                            </ul>
+                        </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="col-md-6 col-lg-7 col-xl-7">
+                @if (focusChat != null)
+                {
+                    <div class="d-flex flex-row justify-content-center align-items-center" style="margin-bottom: 50px;">
+                        <img src="@focusChat.PicturePath" alt="avatar"
+                             class="rounded-circle d-flex align-self-center me-3 shadow-1-strong" width="60">
+                        <div class="pt-1">
+                            <p class="fw-bold mb-0 text-dark">@focusChat.Name</p>
+                        </div>
+                    </div>
+                    <div class="chat-container">
+                    <ul class="list-unstyled text-white">
+
+                        @if (focusChat == null || focusChat.Messages == null || focusChat.Messages.Count == 0)
+                        {
+                            <div class="card-body" style="text-align: center;">
+                                <p class="mb-5">
+                                    Начните Общение
+                                </p>
+                            </div>
+                        }
+                        else
+                        {
+                            foreach (var message in focusChat.Messages)
+                            {
+                                if (message.UserId == userId)
+                                {
+                                    <li class="d-flex justify-content-start mb-4">
+                                        <div class="card mask-custom">
+                                            <div class="card-header d-flex justify-content-between p-3"
+                                                 style="border-bottom: 1px solid rgba(255,255,255,.3);">
+                                                <p class="fw-bold mb-0">Me</p>
+                                                <p class="text-light small mb-0"><i class="far fa-clock"></i> @* 12 mins ago *@</p>
+                                            </div>
+                                            <div class="card-body">
+                                                <p class="mb-0">
+                                                    @message.TextMessage
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </li>
+                                }
+                                else
+                                {
+                                    <li class="d-flex justify-content-end mb-4">
+                                        <div class="card mask-custom">
+                                            <div class="card-header d-flex justify-content-between p-3"
+                                                 style="border-bottom: 1px solid rgba(255,255,255,.3);">
+                                                <p class="fw-bold mb-0">@focusChat.Name</p>
+                                                <p class="text-light small mb-0"><i class="far fa-clock"></i> @* 12 mins ago *@</p>
+                                            </div>
+                                            <div class="card-body">
+                                                <p class="mb-0">
+                                                    @message.TextMessage
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </li>
+                                }
+                            }
+                        }
+
+                        <div class="flex-container">
+                            <input type="search" class="form-control rounded" placeholder="" aria-label="Search" aria-describedby="search-addon" @bind-value=message/>
+                            <button type="button" data-mdb-button-init data-mdb-ripple-init class="btn btn-light btn-lg btn-rounded float-end" @onclick="@SendMessage">Send</button>
+                        </div>
+                    </ul>
+                    </div>
+                    }
+                </div>
+
+            </div>
+
+        </div>
+    </section>
+
+
+@code
+{
+    private bool InitializationFailed = false;
+    private string token { get; set; }
+    private List<ChatDto> chats { get; set; }
+    private ChatDto focusChat { get; set; }
+    private Guid userId { get; set; }
+    private string message { get; set; }
+    private HubConnection _connection;
+
+    protected override async void OnInitialized()
+    {
+        InitializationFailed = false;
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        if (QueryHelpers.ParseQuery(uri.Query).TryGetValue("usrToken", out var token))
+        {
+            token = token.ToString();
+
+            using (var httpClient = new HttpClient())
+            {
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+                var result = await httpClient.GetAsync("http://localhost:5237/api/Chat/GetAllMessage");
+                var resultUser = await httpClient.GetAsync("http://localhost:5237/api/User/GetUserId");
+
+                if (result.IsSuccessStatusCode)
+                {
+                    chats = JsonConvert.DeserializeObject<List<ChatDto>>(await result.Content.ReadAsStringAsync())!;
+
+                    if (chats != null && chats.Count > 0)
+                    {
+                        focusChat = chats.Last();
+                    }
+
+                    if (resultUser.IsSuccessStatusCode)
+                    {
+                        userId = JsonConvert.DeserializeObject<Guid>(await resultUser.Content.ReadAsStringAsync())!;
+                        await StartHub();
+                        StateHasChanged();
+                    }
+                }
+                else
+                {
+                    InitializationFailed = true;
+                }
+            }
+        }
+        else
+        {
+            InitializationFailed = true;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (InitializationFailed)
+        {
+            NavigationManager.NavigateTo("/auth");
+            return;
+        }
+
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+
+        if(QueryHelpers.ParseQuery(uri.Query).TryGetValue("usrToken", out var newToken))
+        {
+            token = newToken.ToString();
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    private void FocusChange(ChatDto chat)
+    {
+        focusChat = chat;
+        StateHasChanged();
+    }
+
+    private async void SendMessage()
+    {
+        if (focusChat != null && !string.IsNullOrEmpty(message))
+        {
+            if (focusChat.Messages == null)
+            {
+                focusChat.Messages = new List<HistoryMessage>();
+            }
+            var messageNew = new HistoryMessage
+                {
+                    TextMessage = message,
+                    UserId = userId,
+                    RelationshipId = focusChat.RelationshipId,
+                    MessageType = DiscordDomain.Enums.MessageType.Text
+                };
+            focusChat.Messages.Add(messageNew);
+
+            await _connection.InvokeAsync("Send", message, userId, true, focusChat.RelationshipId);
+        }
+    }
+
+    private async Task StartHub()
+    {
+        _connection = new HubConnectionBuilder()
+        .WithUrl("http://localhost:5237/chat")
+        .Build();
+
+        _connection.On<string, Guid, bool, Guid, HistoryMessage>("Receive", (message, userSendId, isGroup, chatId, historyMessage) =>
+        {
+            if (userId != userSendId)
+            {
+                var chat = chats.FirstOrDefault(_ => _.RelationshipId == chatId);
+
+                if (chat != null)
+                {
+                    if (chat.Messages != null)
+                    {
+                        chat.Messages.Add(historyMessage);
+                    }
+                    else
+                    {
+                        chat.Messages = new List<HistoryMessage>() { historyMessage };
+                    }
+
+                    
+                    InvokeAsync(StateHasChanged);
+                }
+            }
+        });
+
+        await _connection.StartAsync();
+    }
+}
+
+<style>
+    .gradient-custom {
+        /* fallback for old browsers */
+        background: #fccb90;
+        /* Chrome 10-25, Safari 5.1-6 */
+        background: -webkit-linear-gradient(to bottom right, rgba(252, 203, 144, 1), rgba(213, 126, 235, 1));
+        /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
+        background: linear-gradient(to bottom right, rgba(252, 203, 144, 1), rgba(213, 126, 235, 1))
+    }
+
+    .flex-container {
+        display: flex;
+        align-items: center;
+    }
+    .mask-custom {
+        background: rgba(24, 24, 16, .2);
+        border-radius: 2em;
+        backdrop-filter: blur(15px);
+        border: 2px solid rgba(255, 255, 255, 0.05);
+        background-clip: padding-box;
+        box-shadow: 10px 10px 10px rgba(46, 54, 68, 0.03);
+    }
+
+    .mask-custom-ьу {
+        background: rgba(102, 178, 255, .2);
+        border-radius: 2em;
+        backdrop-filter: blur(15px);
+        border: 2px solid rgba(255, 255, 255, 0.05);
+        background-clip: padding-box;
+        box-shadow: 10px 10px 10px rgba(46, 54, 68, 0.03);
+    }
+
+    .chat-container {
+        max-height: 60vh;
+        overflow-y: auto;
+        padding-right: 10px;
+    }
+</style>

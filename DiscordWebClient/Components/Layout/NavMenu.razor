@@ -1,0 +1,64 @@
+﻿@rendermode InteractiveServer
+@inject NavigationManager NavigationManager
+
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">DiscordWebClient</a>
+    </div>
+</div>
+
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+
+<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+    <nav class="flex-column">
+        <div class="nav-item px-3">
+            <Button class="nav-link" href="" Match="NavLinkMatch.All" @onclick="@ClickMenuHome">
+                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
+            </Button>
+        </div>
+
+        <div class="nav-item px-3">
+            <Button class="nav-link" id="testingButton" @onclick="@ClickMenuFriends">
+                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Friends
+            </Button>
+        </div>
+
+        <div class="nav-item px-3">
+            <Button class="nav-link" @onclick="@ClickMenuChats">
+                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Chats
+            </Button>
+        </div>
+    </nav>
+</div>
+
+@code{
+    void ClickMenuHome(MouseEventArgs e)
+    {
+        Redirect("/");
+    }
+
+    void ClickMenuFriends(MouseEventArgs e)
+    {
+        Redirect("/friends");
+    }
+
+    void ClickMenuChats(MouseEventArgs e)
+    {
+        Redirect("/chat");
+    }
+
+    void Redirect(string path)
+    {
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+
+        if (QueryHelpers.ParseQuery(uri.Query).TryGetValue("usrToken", out var token))
+        {
+            var query = new Dictionary<string, string> { { "usrToken", token! } };
+            NavigationManager.NavigateTo(QueryHelpers.AddQueryString(path, query!));
+        }
+        else
+        {
+            NavigationManager.NavigateTo("/auth");
+        }
+    }
+}
