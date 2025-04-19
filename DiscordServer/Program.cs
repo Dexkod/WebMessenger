@@ -2,6 +2,7 @@ using ApplicationDiscord;
 using DiscordServer.Authentication;
 using DiscordServer.Chats;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,11 +20,7 @@ builder.Services
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-builder.Services.AddSignalR(hubOptions =>
-{
-    hubOptions.EnableDetailedErrors = true;
-    hubOptions.KeepAliveInterval = TimeSpan.FromMinutes(1);
-});
+builder.Services.AddSignalR();
 
 var app = builder.Build();
 

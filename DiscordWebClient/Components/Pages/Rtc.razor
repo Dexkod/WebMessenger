@@ -1,17 +1,10 @@
-﻿@page "/rtc"
+﻿@page "/call/{id:Guid}"
 @using DiscordWebClient.Service
 @inject WebRtcService RtcService;
 @inject IJSRuntime Js
 @rendermode InteractiveServer
 <PageTitle>WebRtc</PageTitle>
 
-<div class="py-4">
-    <label for="channelInput">Channel</label>
-    <input id="channelInput" @bind="_channel" />
-    <button id="startButton" @onclick="StartAction" disabled="@_startDisabled">Start</button>
-    <button id="callButton" @onclick="CallAction" disabled="@_callDisabled">Call</button>
-    <button id="hangupButton" @onclick="HangupAction" disabled="@_hangupDisabled">Hang Up</button>
-</div>
 
 <div class="container">
     <div class="row">
@@ -19,13 +12,19 @@
         <video class="col col-lg-6 p-0" id="remoteVideo" autoplay playsinline></video>
     </div>
 </div>
+<div class="py-4">
+    <button type="button" class="btn btn-success" @onclick="CallAction" hidden="@_callDisabled">Присоединиться</button>
+    <button type="button" class="btn btn-danger" @onclick="HangupAction" hidden="@_hangupDisabled">Отключиться</button>
+</div>
 
 
 @code {
     private IJSObjectReference? _module;
     private bool _startDisabled;
-    private bool _callDisabled = true;
+    private bool _callDisabled = false;
     private bool _hangupDisabled = true;
+    [Parameter]
+    public string Id { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
@@ -39,27 +38,28 @@
                 "import", "/PictureStorage/js/Rtc.razor.js");
         }
         await base.OnAfterRenderAsync(firstRender);
+        await StartAction();
     }
 
     private async Task StartAction()
     {
-        if (string.IsNullOrWhiteSpace(_channel)) return;
+        if (string.IsNullOrWhiteSpace(Id)) return;
         if (_module == null) throw new InvalidOperationException();
         if (_startDisabled) return;
         _startDisabled = true;
-        await RtcService.Join(_channel);
+        await RtcService.Join(Id);
         var stream = await RtcService.StartLocalStream();
 
         await _module.InvokeVoidAsync("setLocalStream", stream);
         RtcService.OnRemoteStreamAcquired += RtcOnOnRemoteStreamAcquired;
-        _callDisabled = false;
+        _callDisabled = true;
     }
 
     private async void RtcOnOnRemoteStreamAcquired(object? _, IJSObjectReference e)
     {
         if (_module == null) throw new InvalidOperationException();
         await _module.InvokeVoidAsync("setRemoteStream", e);
-        _callDisabled = true;
+        _callDisabled = false;
         _hangupDisabled = false;
         _startDisabled = true;
         StateHasChanged();
@@ -67,18 +67,18 @@
 
     private async Task CallAction()
     {
-        if (_callDisabled) return;
-        _callDisabled = true;
+        if (!_callDisabled) return;
+        _callDisabled = false;
         await RtcService.Call();
         _hangupDisabled = false;
     }
     private async Task HangupAction()
     {
         await RtcService.Hangup();
-        _callDisabled = true;
+        _callDisabled = false;
         _hangupDisabled = true;
         _startDisabled = false;
     }
 
-    private string _channel = "foo";
+    // private string _channel = "foo";
 }

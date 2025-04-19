@@ -17,6 +17,7 @@ builder.Services.AddDbContext<ChatsDbContext>(
         o => o.UseNpgsql(builder.Configuration.GetConnectionString("ChatDb")));
 builder.Services.AddControllers();
 builder.Services.AddScoped<WebRtcService>();
+builder.Services.AddSingleton<ChatService>();
 
 var app = builder.Build();
 

@@ -15,13 +15,11 @@ public class MessageHub : Hub
         await Clients.OthersInGroup(channel).SendAsync("Leave", Context.ConnectionId);
     }
 
-    // Used in rtc.razor/webrtcservice.cs
     public async Task SignalWebRtc(string channel, string type, string payload)
     {
         await Clients.OthersInGroup(channel).SendAsync("SignalWebRtc", channel, type, payload);
     }
 
-    // Used on index.razor
     public async Task Offer(string channel, string offer)
     {
         await Clients.OthersInGroup(channel).SendAsync("ReceiveOffer", offer);
