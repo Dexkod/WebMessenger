@@ -34,31 +34,16 @@
 @code{
     void ClickMenuHome(MouseEventArgs e)
     {
-        Redirect("/");
+        NavigationManager.NavigateTo("/");
     }
 
     void ClickMenuFriends(MouseEventArgs e)
     {
-        Redirect("/friends");
+        NavigationManager.NavigateTo("/friends");
     }
 
     void ClickMenuChats(MouseEventArgs e)
     {
-        Redirect("/chat");
-    }
-
-    void Redirect(string path)
-    {
-        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
-
-        if (QueryHelpers.ParseQuery(uri.Query).TryGetValue("usrToken", out var token))
-        {
-            var query = new Dictionary<string, string> { { "usrToken", token! } };
-            NavigationManager.NavigateTo(QueryHelpers.AddQueryString(path, query!));
-        }
-        else
-        {
-            NavigationManager.NavigateTo("/auth");
-        }
+        NavigationManager.NavigateTo("/chat");
     }
 }

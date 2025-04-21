@@ -7,8 +7,20 @@
 @using Service
 @attribute [StreamRendering]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
+<Modal @ref="modal" Title="Звонок">
+    <BodyTemplate>
+        @inputValue
+    </BodyTemplate>
+    <FooterTemplate>
+        <Button Color="ButtonColor.Danger" hidden="@IsGetCall" @onclick="UnTakeOffer">Отклонить</Button>
+        <Button Color="ButtonColor.Success" hidden="@IsGetCall" @onclick="TakeOffer">Взять</Button>
+    </FooterTemplate>
+</Modal>
 
+<AuthorizeView>
+<Authorized>
     <section class="gradient-custom">
         <div class="container py-5">
 
@@ -62,7 +74,14 @@
                              class="rounded-circle d-flex align-self-center me-3 shadow-1-strong" width="60">
                         <div class="pt-1">
                             <p class="fw-bold mb-0 text-dark">@focusChat.Name</p>
-                            <button type="button" class="alert-success" @onclick="CallAudio">Ауди звонок</button>
+                        </div>
+                        <div class="pt-1">
+                            <button type="button" class="alert-success" @onclick="() => GetCall(1)">
+                                <img width="25" height="25" margin="25" src="PictureStorage/callPicture.png" />
+                            </button>
+                            <button type="button" class="alert-success" @onclick="() => GetCall(2)">>
+                                <img width="25" height="25" margin="25" src="PictureStorage/videocall.jpg" />
+                            </button>
                         </div>
                     </div>
                     <div class="chat-container">
@@ -130,64 +149,68 @@
 
         </div>
     </section>
+</Authorized>
+</AuthorizeView>
 
 
 @code
 {
-    private bool InitializationFailed = false;
+    private bool IsAuthorized = false;
     private string token { get; set; }
     private List<ChatDto> chats { get; set; }
     private ChatDto focusChat { get; set; }
     private Guid userId { get; set; }
     private string message { get; set; }
     private HubConnection _connection;
+    private Modal modal;
+    private string inputValue;
+    private Guid senderId;
+    private bool IsGetCall = false;
+    private int typeCall = 0;
 
     protected override async void OnInitialized()
     {
-        InitializationFailed = false;
-        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
-        if (QueryHelpers.ParseQuery(uri.Query).TryGetValue("usrToken", out var token))
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var token = authState.User.FindFirst(ClaimTypes.Sid)?.Value;
+
+        if (token == null)
         {
-            token = token.ToString();
+            return;
+        }
 
-            using (var httpClient = new HttpClient())
+        IsAuthorized = true;
+
+        token = token.ToString();
+
+        using (var httpClient = new HttpClient())
+        {
+            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            var result = await httpClient.GetAsync("http://localhost:5237/api/Chat/GetAllMessage");
+            var resultUser = await httpClient.GetAsync("http://localhost:5237/api/User/GetUserId");
+
+            if (result.IsSuccessStatusCode)
             {
-                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                chats = JsonConvert.DeserializeObject<List<ChatDto>>(await result.Content.ReadAsStringAsync())!;
 
-                var result = await httpClient.GetAsync("http://localhost:5237/api/Chat/GetAllMessage");
-                var resultUser = await httpClient.GetAsync("http://localhost:5237/api/User/GetUserId");
-
-                if (result.IsSuccessStatusCode)
+                if (chats != null && chats.Count > 0)
                 {
-                    chats = JsonConvert.DeserializeObject<List<ChatDto>>(await result.Content.ReadAsStringAsync())!;
-
-                    if (chats != null && chats.Count > 0)
-                    {
-                        focusChat = chats.Last();
-                    }
-
-                    if (resultUser.IsSuccessStatusCode)
-                    {
-                        userId = JsonConvert.DeserializeObject<Guid>(await resultUser.Content.ReadAsStringAsync())!;
-                        StateHasChanged();
-                        await GetHub();
-                    }
+                    focusChat = chats.Last();
                 }
-                else
+
+                if (resultUser.IsSuccessStatusCode)
                 {
-                    InitializationFailed = true;
+                    userId = JsonConvert.DeserializeObject<Guid>(await resultUser.Content.ReadAsStringAsync())!;
+                    StateHasChanged();
+                    await GetHub();
                 }
             }
-        }
-        else
-        {
-            InitializationFailed = true;
         }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (InitializationFailed)
+        if (!IsAuthorized)
         {
             NavigationManager.NavigateTo("/auth");
             return;
@@ -220,11 +243,15 @@
         }
     }
 
-    private async void CallAudio()
+    private async void GetCall(int typeCall)
     {
         if(focusChat != null)
         {
-            NavigationManager.NavigateTo($"/call/{Guid.NewGuid()}");
+            IsGetCall = true;
+            inputValue = "Ожидание подключение";
+            await _connection.InvokeAsync("OfferCall", focusChat.RelationshipId, userId, typeCall);
+            await modal.ShowAsync();
+            this.typeCall = typeCall;
         }
     }
 
@@ -239,6 +266,9 @@
             {
                 var id = userId;
                 _connection.On<string, Guid, bool, Guid, HistoryMessage>("Receive", OnMessageReceived);
+                _connection.On<Guid, Guid, int>("OfferCall", OnOfferCallReceived);
+                _connection.On<string>("GetCall", OnGetCallReceived);
+                _connection.On("UnTakeOffer", OnUnTakeOfferReceived);
 
                 await chatService.StartHub(_connection, userId);
             }
@@ -275,6 +305,38 @@
         {
         }
     }
+
+    private async Task OnOfferCallReceived(Guid senderId, Guid relationShipId, int typeCall)
+    {
+        this.senderId = senderId; 
+        var name = chats.First(_ => _ != null && _.RelationshipId == relationShipId).Name;
+        inputValue = typeCall == 1 ? $"Вам пришел аудизвонок с {name}" :  $"Вам пришел видеозвонок с {name}";
+        await modal.ShowAsync();
+        this.typeCall = typeCall;
+    }
+
+    private async Task OnUnTakeOfferReceived()
+    {
+        await modal.HideAsync();
+        inputValue = "Клиент не принял звонок";
+        await modal.ShowAsync();
+    }
+
+    private void OnGetCallReceived(string room)
+    {
+        NavigationManager.NavigateTo($"call/{room}?typeCall={typeCall}");
+    }
+
+    private async void UnTakeOffer()
+    {
+        await _connection.InvokeAsync("UnTakeOffer", senderId);
+    }
+
+    private async void TakeOffer()
+    {
+        var room = Guid.NewGuid().ToString();
+        await _connection.InvokeAsync("TakeOffer", room, senderId, userId);
+    }
 }
 
 <style>
@@ -286,7 +348,6 @@
         /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
         background: linear-gradient(to bottom right, rgba(252, 203, 144, 1), rgba(213, 126, 235, 1))
     }
-
     .flex-container {
         display: flex;
         align-items: center;

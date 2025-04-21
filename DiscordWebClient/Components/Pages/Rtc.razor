@@ -3,19 +3,42 @@
 @inject WebRtcService RtcService;
 @inject IJSRuntime Js
 @rendermode InteractiveServer
+@inject NavigationManager NavigationManager
+
 <PageTitle>WebRtc</PageTitle>
 
 
-<div class="container">
-    <div class="row">
-        <video class="col col-lg-6 p-0" id="localVideo" autoplay playsinline></video>
-        <video class="col col-lg-6 p-0" id="remoteVideo" autoplay playsinline></video>
+@if(typeCall == 2)
+{
+    <div class="container">
+        <div class="row">
+            <video class="col col-lg-6 p-0" id="localVideo" autoplay playsinline></video>
+            <video class="col col-lg-6 p-0" id="remoteVideo" autoplay playsinline></video>
+        </div>
     </div>
-</div>
-<div class="py-4">
-    <button type="button" class="btn btn-success" @onclick="CallAction" hidden="@_callDisabled">Присоединиться</button>
-    <button type="button" class="btn btn-danger" @onclick="HangupAction" hidden="@_hangupDisabled">Отключиться</button>
-</div>
+    <div class="py-4">
+        <button type="button" class="btn btn-success" @onclick="CallAction" hidden="@_callDisabled">Присоединиться</button>
+        <button type="button" class="btn btn-danger" @onclick="HangupAction" hidden="@_hangupDisabled">Отключиться</button>
+    </div>
+}
+else
+{
+    <div class="container">
+        <div class="row">
+            <video hidden="true" class="col col-lg-6 p-0" id="localVideo" autoplay playsinline></video>
+            <video hidden="true" class="col col-lg-6 p-0" id="remoteVideo" autoplay playsinline></video>
+        </div>
+        <div class="row">
+            <img class="col col-lg-6 p-0" margin-right="50px" width="200" height="200" src="/PictureStorage/4205ab29-ffac-4df2-9b9a-b3a850f79c4d.jpg" />
+            <img class="col col-lg-6 p-0" width="200" height="200" src="/PictureStorage/4205ab29-ffac-4df2-9b9a-b3a850f79c4d.jpg" />
+        </div>
+        <div class="py-4">
+            <button type="button" class="btn btn-success" @onclick="CallAction" hidden="@_callDisabled">Присоединиться</button>
+            <button type="button" class="btn btn-danger" @onclick="HangupAction" hidden="@_hangupDisabled">Отключиться</button>
+        </div>
+    </div>
+}
+
 
 
 @code {
@@ -23,6 +46,10 @@
     private bool _startDisabled;
     private bool _callDisabled = false;
     private bool _hangupDisabled = true;
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public int typeCall { get; set; }
+
     [Parameter]
     public string Id { get; set; }
 
@@ -47,7 +74,7 @@
         if (_module == null) throw new InvalidOperationException();
         if (_startDisabled) return;
         _startDisabled = true;
-        await RtcService.Join(Id);
+        await RtcService.Join(Id, typeCall);
         var stream = await RtcService.StartLocalStream();
 
         await _module.InvokeVoidAsync("setLocalStream", stream);
@@ -78,7 +105,7 @@
         _callDisabled = false;
         _hangupDisabled = true;
         _startDisabled = false;
-    }
 
-    // private string _channel = "foo";
+        NavigationManager.NavigateTo("/chat");
+    }
 }

@@ -3,10 +3,13 @@
 @using ApplicationDiscord.Dto
 @using DiscordDomain.Enums
 @using System.Text.Json
+@using DiscordWebClient.Authentication;
 @layout EmptyNavMenu
 @attribute [AllowAnonymous]
 @rendermode InteractiveServer
 @inject NavigationManager NavigationManager
+@inject TokenService TokenService
+@inject AuthenticationStateProvider AuthStateProvider
 
 <div class="container register">
     <div class="row">
@@ -110,8 +113,20 @@
             var result = await httpClient.PostAsync("http://localhost:5237/api/Authorization/Register", body);
 
             var token = JsonConvert.DeserializeObject<UserToken>(await result.Content.ReadAsStringAsync());
-            var query = new Dictionary<string, string> { { "usrToken", token.Token } };
-            NavigationManager.NavigateTo(QueryHelpers.AddQueryString("/", query));
+
+            await SignIn(token!.Token);
+        }
+    }
+
+    private async Task SignIn(string tokenInput)
+    {
+        if (await TokenService.ValidateTokenAsync(tokenInput))
+        {
+            var userInfo = await TokenService.GetUserInfoAsync(tokenInput);
+
+            await ((CustomAuthStateProvider)AuthStateProvider).UpdateAuthenticationState(userInfo);
+
+            NavigationManager.NavigateTo("/", true);
         }
     }
 

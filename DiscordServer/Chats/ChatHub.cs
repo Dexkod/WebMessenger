@@ -77,8 +77,30 @@ public class ChatHub : Hub
         await Clients.Clients(connections).SendAsync("Receive", message, userId, isGroup, chatId, historyMessage);
         //_context.HistoryMessages.Add(historyMessage);
         //await _context.SaveChangesAsync();
+    }
 
-        //await Clients.All.SendAsync("Receive", message, userId, isGroup, chatId, historyMessage);
+    public async Task OfferCall(Guid chatId, Guid senderId, int typeCall)
+    {
+        var users = await _context.Relationships.Include(_ => _.Users)
+                .Select(_ => new { Id = _.Id, Users = _.Users }).FirstAsync(_ => _.Id == chatId);
+        var recipientId = users.Users.Select(_ => _.Id).Single(_ => _ != senderId);
+
+        if (!_connections.ContainsKey(recipientId))
+        {
+            return;
+        }
+
+        await Clients.Client(_connections[recipientId]).SendAsync("OfferCall", senderId, chatId, typeCall);
+    }
+
+    public async Task UnTakeOffer(Guid senderId)
+    {
+        await Clients.Clients(_connections[senderId]).SendAsync("UnTakeOffer");
+    }
+
+    public async Task TakeOffer(string room, Guid senderId, Guid recipientId)
+    {
+        await Clients.Clients(_connections[senderId], _connections[recipientId]).SendAsync("GetCall", room);
     }
 
     public async Task ReceiveSignal(string signal)

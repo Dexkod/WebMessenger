@@ -1,8 +1,11 @@
 ﻿@page "/"
 @using System.Net.Http.Headers
-@rendermode InteractiveServer
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
 @inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
+<AuthorizeView>
+<Authorized>
 @if(user != null)
 {
     <section class="h-100 gradient-custom-2">
@@ -84,49 +87,46 @@
         </div>
     </section>
 }
+</Authorized>
+</AuthorizeView>
 
 @code
 {
     private bool InitializationFailed = false;
-    private string token { get; set; }
     private InfoUser user { get; set; }
     private string pathPicture { get; set; }
+    private bool IsAuthorized { get; set; } = false;
 
     protected override async void OnInitialized()
     {
-        InitializationFailed = false;
-        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
-        if (QueryHelpers.ParseQuery(uri.Query).TryGetValue("usrToken", out var token))
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var token = authState.User.FindFirst(ClaimTypes.Sid)?.Value;
+
+        if (token == null)
         {
-            token = token.ToString();
-
-            using(var httpClient = new HttpClient())
-            {
-                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-                var result = await httpClient.GetAsync("http://localhost:5237/api/User/GetUser");
-
-                if (result.IsSuccessStatusCode)
-                {
-                    user = JsonConvert.DeserializeObject<InfoUser>(await result.Content.ReadAsStringAsync())!;
-                    pathPicture = $"/PictureStorage/{user.PictureId}.jpg";
-                    StateHasChanged();
-                }
-                else
-                {
-                    InitializationFailed = true;
-                }
-            }
+            return;
         }
-        else
+
+        IsAuthorized = true;
+
+        using (var httpClient = new HttpClient())
         {
-            InitializationFailed = true;
+            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            var result = await httpClient.GetAsync("http://localhost:5237/api/User/GetUser");
+
+            if (result.IsSuccessStatusCode)
+            {
+                user = JsonConvert.DeserializeObject<InfoUser>(await result.Content.ReadAsStringAsync())!;
+                pathPicture = $"/PictureStorage/{user.PictureId}.jpg";
+                StateHasChanged();
+            }
         }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (InitializationFailed)
+        if (!IsAuthorized)
         {
             NavigationManager.NavigateTo("/auth");
         }

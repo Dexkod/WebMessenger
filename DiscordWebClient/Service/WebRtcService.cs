@@ -20,7 +20,7 @@ public class WebRtcService
         _nav = nav;
     }
 
-    public async Task Join(string signalingChannel)
+    public async Task Join(string signalingChannel, int typeCall)
     {
         if (_signalingChannel != null) throw new InvalidOperationException();
         _signalingChannel = signalingChannel;
@@ -30,6 +30,7 @@ public class WebRtcService
             "import", "/PictureStorage/js/WebRtcService.cs.js");
         _jsThis = DotNetObjectReference.Create(this);
         await _jsModule.InvokeVoidAsync("initialize", _jsThis);
+        await _jsModule.InvokeVoidAsync("callVideo");
     }
     public async Task<IJSObjectReference> StartLocalStream()
     {

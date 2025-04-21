@@ -1,12 +1,20 @@
 ﻿@page "/auth"
 @using DiscordWebClient.Components.Layout
+@using DiscordWebClient.Authentication
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authentication.Cookies
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Components.Authorization
 @layout EmptyNavMenu
 @attribute [AllowAnonymous]
-@rendermode InteractiveServer
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
 @inject NavigationManager NavigationManager
+@inject TokenService TokenService
+@inject AuthenticationStateProvider AuthStateProvider
 
 
-
+<AuthorizeView>
+<NotAuthorized>
 <section class="vh-100">
   <div class="container-fluid h-custom">
     <div class="row d-flex justify-content-center align-items-center h-100">
@@ -78,6 +86,8 @@
     <!-- Right -->
   </div>
 </section>
+</NotAuthorized>
+</AuthorizeView>
 
 <style>
     .divider:after,
@@ -109,11 +119,24 @@ height: calc(100% - 73px);
                 Password = Password
             });
 
-            var result = await httpClient.PostAsync("http://localhost:5237/api/Authorization/SignIn", body);
 
+
+            var result = await httpClient.PostAsync("http://localhost:5237/api/Authorization/SignIn", body);
             var token = JsonConvert.DeserializeObject<UserToken>(await result.Content.ReadAsStringAsync());
-            var query = new Dictionary<string, string> { { "usrToken", token.Token } };
-            NavigationManager.NavigateTo(QueryHelpers.AddQueryString("/", query));
+
+            await SignIn(token!.Token);
+        }
+    }
+
+    private async Task SignIn(string tokenInput)
+    {
+        if (await TokenService.ValidateTokenAsync(tokenInput))
+        {
+            var userInfo = await TokenService.GetUserInfoAsync(tokenInput);
+
+            await ((CustomAuthStateProvider)AuthStateProvider).UpdateAuthenticationState(userInfo);
+
+            NavigationManager.NavigateTo("/", true);
         }
     }
 }

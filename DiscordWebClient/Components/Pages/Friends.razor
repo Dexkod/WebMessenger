@@ -1,9 +1,12 @@
 ﻿@page "/friends"
 @using System.Net.Http.Headers
 @using ApplicationDiscord.Dto.Relationship
-@rendermode InteractiveServer
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
 @inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
+@* <AuthorizeView>
+<Authorized> *@
 <div style="display: flex; justify-content: center; align-items: center;">
     <p>Поиск друзей</p>
 </div>
@@ -62,33 +65,34 @@
             </div>
         </section>
     }
-}
+ }
+@*  </Authorized>
+</AuthorizeView> *@
 
 @code {
-    private bool InitializationFailed = false;
+    private bool IsAuthorized = false;
     private string token { get; set; }
     private List<InfoFriends> friends { get; set; }
 
     protected async override void OnInitialized()
     {
-        InitializationFailed = false;
-        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
-        if (QueryHelpers.ParseQuery(uri.Query).TryGetValue("usrToken", out var token))
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var token = authState.User.FindFirst(ClaimTypes.Sid)?.Value;
+
+        if (token == null)
         {
-            this.token = token.ToString();
-            InitializationFailed = false;
+            return;
         }
-        else
-        {
-            InitializationFailed = true;
-        }
+
+        this.token = token;
+        IsAuthorized = true;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (InitializationFailed)
+        if (!IsAuthorized)
         {
-            NavigationManager.NavigateTo("/auth");
+            NavigationManager.NavigateTo("/auth", false);
         }
 
         if(friends == null)
