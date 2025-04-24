@@ -48,12 +48,16 @@ public class WebRtcService
     public async Task Hangup()
     {
         if (_jsModule == null) throw new InvalidOperationException();
-        await _jsModule.InvokeVoidAsync("hangupAction");
 
         var hub = await GetHub();
         await hub.SendAsync("leave", _signalingChannel);
 
         _signalingChannel = null;
+    }
+
+    private async Task Leave()
+    {
+        await _jsModule.InvokeVoidAsync("hangupAction");
     }
 
     private async Task<HubConnection> GetHub()
@@ -83,6 +87,8 @@ public class WebRtcService
                     break;
             }
         });
+
+        hub.On("Leave", Leave);
 
         await hub.StartAsync();
         _hub = hub;

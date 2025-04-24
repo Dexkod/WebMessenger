@@ -32,7 +32,6 @@ public class CustomAuthStateProvider : AuthenticationStateProvider
             return await Task.FromResult(new AuthenticationState(claimsPrincipal));
         }
         catch (Exception ex)
-
         {
             return await Task.FromResult(new AuthenticationState(_anonymous));
         }

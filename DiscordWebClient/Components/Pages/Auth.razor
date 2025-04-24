@@ -119,8 +119,6 @@ height: calc(100% - 73px);
                 Password = Password
             });
 
-
-
             var result = await httpClient.PostAsync("http://localhost:5237/api/Authorization/SignIn", body);
             var token = JsonConvert.DeserializeObject<UserToken>(await result.Content.ReadAsStringAsync());
 

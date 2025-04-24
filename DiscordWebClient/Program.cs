@@ -30,8 +30,9 @@ builder.Services.AddDbContext<ChatsDbContext>(
         o => o.UseNpgsql(builder.Configuration.GetConnectionString("ChatDb")));
 builder.Services.AddControllers();
 builder.Services.AddScoped<WebRtcService>();
-builder.Services.AddSingleton<ChatService>();
+builder.Services.AddScoped<ChatService>();
 builder.Services.AddScoped<TokenService>();
+
 builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthStateProvider>();
 builder.Services.AddScoped<ProtectedSessionStorage>();
 

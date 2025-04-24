@@ -1,0 +1,127 @@
+﻿@using System.Net.Http.Headers
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<Modal @ref="modal" Title="@Title">
+    <BodyTemplate>
+        <div style="margin-bottom: 20px">
+            <p style="margin-bottom: 10px">Название группы</p>
+            <input type="text" @bind=name></input>
+        </div>
+        <div>
+            <p>Участники</p>
+        </div>
+        <div class="list-group">
+            @if(friends != null)
+            {
+                @foreach (var item in friends)
+                {
+                    <button type="button" class="list-group-item list-group-item-action" style="background-color: @(item.Value ? "#0000FF" : "#CFCFCF"); margin-bottom:10px;"
+                            @onclick="() => AddFriendList(item.Key)">
+                        @item.Key.Login
+                    </button>
+                }
+            }
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <Button Color="ButtonColor.Danger" @onclick="CloseModal">Отменить</Button>
+        <Button Color="ButtonColor.Success" @onclick="SaveGroup">Создать</Button>
+    </FooterTemplate>
+</Modal>
+
+@code {
+    public event Func<ChatDto, List<Guid>, Task>? ClosedModal;
+    private Modal? modal;
+
+    [Parameter]
+    public string Title { get; set; } = "Создание группы";
+    [Parameter]
+    public EventCallback OnAccept { get; set; }
+    [Parameter]
+    public EventCallback OnReject { get; set; }
+    private ChatDto? chat = null;
+    private Dictionary<InfoFriends, bool> friends { get; set; } = new Dictionary<InfoFriends, bool>();
+    private string name { get; set; }
+    private string token;
+    private Guid userId;
+
+    public async Task ShowAsync()
+    {
+        friends.Clear();
+        name = string.Empty;
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        token = authState.User.FindFirst(ClaimTypes.Sid)?.Value!;
+        var login = authState.User.FindFirst(ClaimTypes.Name)?.Value;
+        userId = Guid.Parse(authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
+        var query = new Dictionary<string, string>();
+
+        if (!string.IsNullOrEmpty(login))
+        {
+            query.Add("login", login);
+        }
+
+        using var httpClient = new HttpClient();
+
+        httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var result = await httpClient.GetAsync(QueryHelpers.AddQueryString("http://localhost:5237/api/Relationship/GetFriends", query));
+
+        if (result.IsSuccessStatusCode)
+        {
+            var response = JsonConvert.DeserializeObject<List<InfoFriends>>(await result.Content.ReadAsStringAsync());
+
+            foreach (var item in response!)
+            {
+                friends.Add(item, false);
+            }
+        }
+
+        StateHasChanged();
+
+        await modal!.ShowAsync();
+    }
+
+    private void AddFriendList(InfoFriends friend)
+    {
+        friends[friend] = !friends[friend];
+        StateHasChanged();
+    }
+
+    private async void SaveGroup()
+    {
+        if(friends.Where(_ => _.Value == true).Count() < 2)
+        {
+            return;
+        }
+
+        using var client = new HttpClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var usersIds = friends.Where(_ => _.Value == true).Select(_ => _.Key.Id).ToList();
+
+        var body = new CreateGroupDto()
+        {
+            Name = name,
+            CreatedUserId = userId,
+            UsersIds = usersIds,
+
+        };
+        var result = await client.PostAsJsonAsync("http://localhost:5237/api/Chat/CreateGroup", body);
+
+        var response = JsonConvert.DeserializeObject<Guid>(await result.Content.ReadAsStringAsync());
+
+        await modal!.HideAsync();
+        await ClosedModal!.Invoke(new ChatDto()
+        {
+            Name = name,
+            PicturePath = "/PictureStorage/190197f4-f672-4305-b587-8de083204592.jpg",
+            RelationshipId = response,
+            ModifiedTime = DateTime.UtcNow
+        }, usersIds);
+    }
+
+    private async void CloseModal()
+    {
+        await modal!.HideAsync();
+    }
+}

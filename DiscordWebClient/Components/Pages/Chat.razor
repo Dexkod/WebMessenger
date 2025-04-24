@@ -4,18 +4,20 @@
 @using Microsoft.AspNetCore.SignalR.Client;
 @using System.Net.Http.Headers
 @using DiscordDomain.Models
-@using Service
 @attribute [StreamRendering]
-@rendermode @(new InteractiveServerRenderMode(prerender: false))
 @inject AuthenticationStateProvider AuthenticationStateProvider
+
+<CreateGroup @ref="createGroupmodal">
+
+</CreateGroup>
 
 <Modal @ref="modal" Title="Звонок">
     <BodyTemplate>
-        @inputValue
+        
     </BodyTemplate>
     <FooterTemplate>
-        <Button Color="ButtonColor.Danger" hidden="@IsGetCall" @onclick="UnTakeOffer">Отклонить</Button>
-        <Button Color="ButtonColor.Success" hidden="@IsGetCall" @onclick="TakeOffer">Взять</Button>
+        <Button Color="ButtonColor.Danger" hidden="@IsGetCall" @onclick="UnTakeOffer">Закрыть</Button>
+        <Button Color="ButtonColor.Success" hidden="@IsGetCall" @onclick="TakeOffer">Сохранить</Button>
     </FooterTemplate>
 </Modal>
 
@@ -34,6 +36,17 @@
                         <div class="card-body">
                         <div class="chat-container">
                             <ul class="list-unstyled mb-0">
+                                <li class="p-2 border-bottom" style="border-bottom: 1px solid rgba(255,255,255,.3) !important;">
+                                    <a class="d-flex justify-content-between link-light" @onclick="ShowModal">
+                                        <div class="d-flex flex-row">
+                                            <img src="/PictureStorage/GroupPicture.jpg"
+                                                class="rounded-circle d-flex align-self-center me-3 shadow-1-strong" width="60">
+                                                <div class="pt-1">
+                                                    <p class="fw-bold mb-0 text-dark" style="">Создать группу</p>        
+                                                </div>
+                                        </div>
+                                    </a>
+                                </li>
                             @if(chats != null)
                             {
                                 @foreach (var item in chats)
@@ -75,14 +88,22 @@
                         <div class="pt-1">
                             <p class="fw-bold mb-0 text-dark">@focusChat.Name</p>
                         </div>
-                        <div class="pt-1">
-                            <button type="button" class="alert-success" @onclick="() => GetCall(1)">
-                                <img width="25" height="25" margin="25" src="PictureStorage/callPicture.png" />
-                            </button>
-                            <button type="button" class="alert-success" @onclick="() => GetCall(2)">>
-                                <img width="25" height="25" margin="25" src="PictureStorage/videocall.jpg" />
-                            </button>
-                        </div>
+                        @if (focusChat.IsGroup)
+                        {
+                                    
+                        }
+                        else
+                        {
+                            <div class="pt-1">
+                                <button type="button" class="alert-success" @onclick="() => GetCall(1)">
+                                    <img width="25" height="25" margin="25" src="PictureStorage/callPicture.png" />
+                                </button>
+                                <button type="button" class="alert-success" @onclick="() => GetCall(2)">>
+                                    <img width="25" height="25" margin="25" src="PictureStorage/videocall.jpg" />
+                                </button>
+                            </div>
+                        }
+                                
                     </div>
                     <div class="chat-container">
                     <ul class="list-unstyled text-white">
@@ -122,7 +143,7 @@
                                         <div class="card mask-custom">
                                             <div class="card-header d-flex justify-content-between p-3"
                                                  style="border-bottom: 1px solid rgba(255,255,255,.3);">
-                                                <p class="fw-bold mb-0">@focusChat.Name</p>
+                                                <p class="fw-bold mb-0">@message.UserName</p>
                                                 <p class="text-light small mb-0"><i class="far fa-clock"></i> @* 12 mins ago *@</p>
                                             </div>
                                             <div class="card-body">
@@ -161,12 +182,12 @@
     private ChatDto focusChat { get; set; }
     private Guid userId { get; set; }
     private string message { get; set; }
-    private HubConnection _connection;
     private Modal modal;
     private string inputValue;
     private Guid senderId;
     private bool IsGetCall = false;
     private int typeCall = 0;
+    private CreateGroup createGroupmodal;
 
     protected override async void OnInitialized()
     {
@@ -187,25 +208,30 @@
             httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
             var result = await httpClient.GetAsync("http://localhost:5237/api/Chat/GetAllMessage");
-            var resultUser = await httpClient.GetAsync("http://localhost:5237/api/User/GetUserId");
 
             if (result.IsSuccessStatusCode)
             {
                 chats = JsonConvert.DeserializeObject<List<ChatDto>>(await result.Content.ReadAsStringAsync())!;
+                chats = chats.OrderByDescending(_ => _.ModifiedTime).ToList();
 
                 if (chats != null && chats.Count > 0)
                 {
-                    focusChat = chats.Last();
+                    focusChat = chats.First();
                 }
 
-                if (resultUser.IsSuccessStatusCode)
-                {
-                    userId = JsonConvert.DeserializeObject<Guid>(await resultUser.Content.ReadAsStringAsync())!;
-                    StateHasChanged();
-                    await GetHub();
-                }
+                userId = Guid.Parse(authState.User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
             }
         }
+
+        chatService.OnUnTakeOfferReceived += OnUnTakeOfferReceived;
+        chatService.OnMessageReceived += OnMessageReceived;
+        chatService.OnGetCallReceived += OnGetCallReceived;
+        chatService.OnOfferCallReceived += OnOfferCallReceived;
+        chatService.OnCreateChatReceived += OnCreateChatReceived;
+
+        createGroupmodal.ClosedModal += HideModal;
+
+        StateHasChanged();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -226,6 +252,7 @@
         await base.OnAfterRenderAsync(firstRender);
     }
 
+
     private void FocusChange(ChatDto chat)
     {
         focusChat = chat;
@@ -236,8 +263,8 @@
     {
         if (focusChat != null && !string.IsNullOrEmpty(message))
         {
-            var hub = await GetHub();
-            await hub.InvokeAsync("Send", message, userId, true, focusChat.RelationshipId);
+            var hub = chatService.GetHub(userId);
+            await hub.InvokeAsync("Send", message, userId, focusChat.RelationshipId);
             message = string.Empty;
             await InvokeAsync(StateHasChanged);
         }
@@ -249,35 +276,13 @@
         {
             IsGetCall = true;
             inputValue = "Ожидание подключение";
-            await _connection.InvokeAsync("OfferCall", focusChat.RelationshipId, userId, typeCall);
+            await chatService.GetHub(userId).InvokeAsync("OfferCall", focusChat.RelationshipId, userId, typeCall);
             await modal.ShowAsync();
             this.typeCall = typeCall;
         }
     }
 
-    private async Task<HubConnection> GetHub()
-    {
-        if (_connection == null && userId != Guid.Empty)
-        {
-            _connection = chatService.GetHub(userId);
-            var s = _connection.State;
-
-            if (!chatService.Connects.ContainsKey(userId))
-            {
-                var id = userId;
-                _connection.On<string, Guid, bool, Guid, HistoryMessage>("Receive", OnMessageReceived);
-                _connection.On<Guid, Guid, int>("OfferCall", OnOfferCallReceived);
-                _connection.On<string>("GetCall", OnGetCallReceived);
-                _connection.On("UnTakeOffer", OnUnTakeOfferReceived);
-
-                await chatService.StartHub(_connection, userId);
-            }
-        }
-
-        return _connection;
-    }
-
-    private async Task OnMessageReceived(string message, Guid userSendId, bool isGroup, Guid chatId, HistoryMessage historyMessage)
+    private async Task OnMessageReceived(string message, Guid userSendId, Guid chatId, HistoryMessage historyMessage)
     {
         try
         {
@@ -289,12 +294,15 @@
                 if (chat.Messages != null)
                 {
                     chat.Messages.Add(historyMessage);
+                    chat.ModifiedTime = DateTime.Now;
                 }
                 else
                 {
                     chat.Messages = new List<HistoryMessage>() { historyMessage };
+                    chat.ModifiedTime = DateTime.Now;
                 }
 
+                chats = chats.OrderByDescending(_ => _.ModifiedTime).ToList();
                 await InvokeAsync(() =>
                 {
                     this.StateHasChanged();
@@ -319,7 +327,10 @@
     {
         await modal.HideAsync();
         inputValue = "Клиент не принял звонок";
+        IsGetCall = true;
+        await Task.Delay(1000);
         await modal.ShowAsync();
+        IsGetCall = false;
     }
 
     private void OnGetCallReceived(string room)
@@ -329,13 +340,43 @@
 
     private async void UnTakeOffer()
     {
-        await _connection.InvokeAsync("UnTakeOffer", senderId);
+        await chatService.GetHub(userId).InvokeAsync("UnTakeOffer", senderId);
+        await modal.HideAsync();
     }
 
     private async void TakeOffer()
     {
         var room = Guid.NewGuid().ToString();
-        await _connection.InvokeAsync("TakeOffer", room, senderId, userId);
+        await chatService.GetHub(userId).InvokeAsync("TakeOffer", room, senderId, userId);
+    }
+
+    private async Task ShowModal()
+    {
+        await createGroupmodal!.ShowAsync();
+    }
+
+    private async Task HideModal(ChatDto chat, List<Guid> userIds)
+    {
+        chats.Add(chat);
+        chats = chats.OrderByDescending(_ => _.ModifiedTime).ToList();
+
+        await chatService.GetHub(userId).SendAsync("CreateChat", chat.Name, chat.PicturePath, userIds, chat.RelationshipId);
+        StateHasChanged();
+    }
+
+    private void OnCreateChatReceived(string name, string picturePath, Guid chatId)
+    {
+        chats.Add(new ChatDto()
+        {
+            RelationshipId = chatId,
+            Name = name,
+            PicturePath = picturePath,
+            ModifiedTime = DateTime.UtcNow,
+            IsGroup = true
+        });
+
+        chats = chats.OrderByDescending(_ => _.ModifiedTime).ToList();
+        InvokeAsync(StateHasChanged);
     }
 }
 

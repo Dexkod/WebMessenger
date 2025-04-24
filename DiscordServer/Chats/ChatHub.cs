@@ -36,19 +36,27 @@ public class ChatHub : Hub
         }
     }
 
-    public async Task Send(string message, Guid userId, bool isGroup, Guid chatId)
+    public async Task Send(string message, Guid userId, Guid chatId)
     {
         List<string> connections = new List<string>();
         HistoryMessage historyMessage = null;
-        
-        if (isGroup)
+
+        var group = await _context.Groups.Include(_ => _.Groups)
+                .FirstOrDefaultAsync(_ => _.Id == chatId);
+
+        var user = await _context.Users.FirstAsync(_ => _.Id == userId);
+
+        if (group == null)
         {
             historyMessage = new HistoryMessage
             {
                 TextMessage = message,
                 UserId = userId,
                 RelationshipId = chatId,
-                MessageType = MessageType.Text
+                MessageType = MessageType.Text,
+                UserName = user.Login,
+                CreateAt = DateTime.UtcNow,
+                UpdateAt = DateTime.UtcNow
             };
 
             var relationship = await _context.Relationships.Include(_ => _.Users)
@@ -71,12 +79,25 @@ public class ChatHub : Hub
                 TextMessage = message,
                 UserId = userId,
                 GroupId = chatId,
-                MessageType = MessageType.Text
+                MessageType = MessageType.Text,
+                UserName = user.Login,
+                CreateAt = DateTime.UtcNow,
+                UpdateAt = DateTime.UtcNow
             };
+
+            foreach (var id in group.Groups!.Select(_ => _.UserId))
+            {
+                if (!_connections.ContainsKey(id))
+                {
+                    continue;
+                }
+
+                connections.Add(_connections[id]);
+            }
         }
-        await Clients.Clients(connections).SendAsync("Receive", message, userId, isGroup, chatId, historyMessage);
-        //_context.HistoryMessages.Add(historyMessage);
-        //await _context.SaveChangesAsync();
+        await Clients.Clients(connections).SendAsync("Receive", message, userId, chatId, historyMessage);
+        _context.HistoryMessages.Add(historyMessage);
+        await _context.SaveChangesAsync();
     }
 
     public async Task OfferCall(Guid chatId, Guid senderId, int typeCall)
@@ -106,5 +127,20 @@ public class ChatHub : Hub
     public async Task ReceiveSignal(string signal)
     {
         await Clients.All.SendAsync("ReceiveSignal", signal);
+    }
+
+    public async Task CreateChat(string name, string picturePath, List<Guid> userIds, Guid chatId)
+    {
+        List<string> connections = new List<string>();
+
+        foreach(var item in  userIds)
+        {
+            if (_connections.ContainsKey(item))
+            {
+                connections.Add(_connections[item]);
+            }
+        }
+
+        await Clients.Clients(connections).SendAsync("CreateChat", name, picturePath, chatId);
     }
 }

@@ -3,6 +3,7 @@
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @inject NavigationManager NavigationManager
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ChatService chatService
 
 <AuthorizeView>
 <Authorized>
@@ -122,6 +123,9 @@
                 StateHasChanged();
             }
         }
+
+        var hub = chatService.GetHub(user.Id);
+        await chatService.StartHub(hub, user.Id);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

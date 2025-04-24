@@ -5,8 +5,8 @@
 @inject NavigationManager NavigationManager
 @inject AuthenticationStateProvider AuthenticationStateProvider
 
-@* <AuthorizeView>
-<Authorized> *@
+<AuthorizeView>
+<Authorized>
 <div style="display: flex; justify-content: center; align-items: center;">
     <p>Поиск друзей</p>
 </div>
@@ -66,8 +66,8 @@
         </section>
     }
  }
-@*  </Authorized>
-</AuthorizeView> *@
+ </Authorized>
+</AuthorizeView>
 
 @code {
     private bool IsAuthorized = false;
