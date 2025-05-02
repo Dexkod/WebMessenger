@@ -4,6 +4,7 @@
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @inject NavigationManager NavigationManager
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IConfiguration config
 
 <AuthorizeView>
 <Authorized>
@@ -130,7 +131,7 @@
                 query.Add("login", login);
             }
 
-            var result = await httpClient.GetAsync(QueryHelpers.AddQueryString("http://localhost:5237/api/Relationship/GetOtherPeople", query));
+            var result = await httpClient.GetAsync(QueryHelpers.AddQueryString($"{config["ServerApi:BaseUrl"]}/Relationship/GetOtherPeople", query));
 
             if (result.IsSuccessStatusCode)
             {
@@ -159,7 +160,7 @@
                 query.Add("login", login);
             }
 
-            var result = await httpClient.GetAsync(QueryHelpers.AddQueryString("http://localhost:5237/api/Relationship/GetFriends", query));
+            var result = await httpClient.GetAsync(QueryHelpers.AddQueryString($"{config["ServerApi:BaseUrl"]}/Relationship/GetFriends", query));
 
             if (result.IsSuccessStatusCode)
             {
@@ -186,7 +187,7 @@
                 Id = friend.Id
             });
 
-            var result = await httpClient.PostAsync("http://localhost:5237/api/Relationship/AddFriend", body);
+            var result = await httpClient.PostAsync($"{config["ServerApi:BaseUrl"]}/Relationship/AddFriend", body);
 
             if (result.IsSuccessStatusCode)
             {
@@ -207,7 +208,7 @@
                 Id = friend.Id
             });
 
-            var result = await httpClient.PostAsync("http://localhost:5237/api/Relationship/RemoveFriend", body);
+            var result = await httpClient.PostAsync($"{config["ServerApi:BaseUrl"]}/Relationship/RemoveFriend", body);
 
             if (result.IsSuccessStatusCode)
             {

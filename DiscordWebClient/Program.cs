@@ -34,6 +34,7 @@ builder.Services.AddScoped<ChatService>();
 builder.Services.AddScoped<TokenService>();
 
 builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthStateProvider>();
+builder.Services.AddScoped<CustomAuthStateProvider>();
 builder.Services.AddScoped<ProtectedSessionStorage>();
 
 builder.Services.AddServerSideBlazor();

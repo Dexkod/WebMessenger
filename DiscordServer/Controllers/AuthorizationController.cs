@@ -1,8 +1,9 @@
 ﻿using ApplicationDiscord;
+using ApplicationDiscord.Dto;
 using DiscordDomain.Enums;
 using DiscordDomain.Models;
 using DiscordServer.Authentication;
-using ApplicationDiscord.Dto;
+using DiscordServer.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -16,44 +17,38 @@ namespace DiscordServer.Controllers;
 public class AuthorizationController : ControllerBase
 {
     private ChatsDbContext _context;
+    private EmailService _emailService;
 
-    public AuthorizationController(ChatsDbContext context)
+    public AuthorizationController(ChatsDbContext context,
+        EmailService emailService)
     {
         _context = context;
+        _emailService = emailService;
+    }
+
+    [AllowAnonymous]
+    [HttpPost("[action]")]
+    public async Task<IActionResult> SendCode(ApprovalAccount approvalAccount)
+    {
+        var number = (new Random()).Next(1000, 10000);
+        string text = $"Код подтверждения акаунта {approvalAccount.Login}: {number}";
+        await _emailService.SendEmailAsync(approvalAccount.Email, "Регистрация аккаунта", text);
+
+        return Ok();
     }
 
     [AllowAnonymous]
     [HttpPost("[action]")]
     public async Task<IActionResult> SignIn([FromBody] SignInUser user)
     {
-        var userDb = await _context.Users.SingleOrDefaultAsync(_ => _.Login == user.Login.Trim());
+        var userToken = await GetUserToken(user);
 
-        if (userDb == null)
+        if (userToken == null)
         {
-            return NotFound();
+            BadRequest();
         }
 
-        if (userDb.PasswordHash != Hash.StringWithSalt(user.Password, userDb.PasswordSalt))
-        {
-            return BadRequest();
-        }
-
-        var authToken = new AuthorizationToken()
-        {
-            Id = new Guid(),
-            UserId = userDb.Id,
-            CreateAt = DateTime.UtcNow,
-            UpdateAt = DateTime.UtcNow,
-        };
-
-        _context.AuthorizationTokens.Add(authToken);
-        await _context.SaveChangesAsync();
-
-        return Ok(new UserToken()
-        {
-            Id = userDb.Id,
-            Token = authToken.Id.ToString()
-        });
+        return Ok(userToken);
     }
 
     [AllowAnonymous]
@@ -80,10 +75,21 @@ public class AuthorizationController : ControllerBase
         }
 
         var userDb = await _context.Users.FirstOrDefaultAsync(_ => _.Login == user.Login);
+        var checkEmail = await _emailService.TryFindMessage(new Notification()
+        {
+            Addressee = user.Email,
+            Type = NotificationType.Email,
+            Message = user.Code
+        });
 
-        if(userDb != null)
+        if (userDb != null)
         {
             return Conflict();
+        }
+
+        if (!checkEmail)
+        {
+            return BadRequest();
         }
 
         var salt = Hash.GeneratePasswordSalt();
@@ -110,12 +116,44 @@ public class AuthorizationController : ControllerBase
         _context.Users.Add(newUser);
         await _context.SaveChangesAsync();
 
-        var userToken = await SignIn(new SignInUser()
+        var userToken = await GetUserToken(new SignInUser()
         {
             Login = user.Login,
             Password = user.Password
         });
 
         return Ok(userToken);
+    }
+
+    private async Task<UserToken> GetUserToken(SignInUser user)
+    {
+        var userDb = await _context.Users.SingleOrDefaultAsync(_ => _.Login == user.Login.Trim());
+
+        if (userDb == null)
+        {
+            return null!;
+        }
+
+        if (userDb.PasswordHash != Hash.StringWithSalt(user.Password, userDb.PasswordSalt))
+        {
+            return null!;
+        }
+
+        var authToken = new AuthorizationToken()
+        {
+            Id = new Guid(),
+            UserId = userDb.Id,
+            CreateAt = DateTime.UtcNow,
+            UpdateAt = DateTime.UtcNow,
+        };
+
+        _context.AuthorizationTokens.Add(authToken);
+        await _context.SaveChangesAsync();
+
+        return new UserToken()
+        {
+            Id = userDb.Id,
+            Token = authToken.Id.ToString()
+        };
     }
 }

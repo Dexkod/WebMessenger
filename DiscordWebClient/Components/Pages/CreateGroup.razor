@@ -1,5 +1,6 @@
 ﻿@using System.Net.Http.Headers
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IConfiguration config
 
 <Modal @ref="modal" Title="@Title">
     <BodyTemplate>
@@ -35,10 +36,6 @@
 
     [Parameter]
     public string Title { get; set; } = "Создание группы";
-    [Parameter]
-    public EventCallback OnAccept { get; set; }
-    [Parameter]
-    public EventCallback OnReject { get; set; }
     private ChatDto? chat = null;
     private Dictionary<InfoFriends, bool> friends { get; set; } = new Dictionary<InfoFriends, bool>();
     private string name { get; set; }
@@ -64,7 +61,7 @@
         using var httpClient = new HttpClient();
 
         httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        var result = await httpClient.GetAsync(QueryHelpers.AddQueryString("http://localhost:5237/api/Relationship/GetFriends", query));
+        var result = await httpClient.GetAsync(QueryHelpers.AddQueryString($"{config["ServerApi:BaseUrl"]}/Relationship/GetFriends", query));
 
         if (result.IsSuccessStatusCode)
         {
@@ -106,7 +103,7 @@
             UsersIds = usersIds,
 
         };
-        var result = await client.PostAsJsonAsync("http://localhost:5237/api/Chat/CreateGroup", body);
+        var result = await client.PostAsJsonAsync($"{config["ServerApi:BaseUrl"]}/Chat/CreateGroup", body);
 
         var response = JsonConvert.DeserializeObject<Guid>(await result.Content.ReadAsStringAsync());
 

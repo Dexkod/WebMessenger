@@ -1,0 +1,168 @@
+﻿@using System.Net.Http.Headers
+@using DiscordWebClient.Authentication;
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IConfiguration config
+@inject NavigationManager NavigationManager
+@inject TokenService TokenService
+
+<Modal @ref="modal" Title="@Title">
+    <BodyTemplate>
+        <div class="form-group">
+            <p>Code</p>
+            <div class="d-flex" style="gap: 10px;">
+                <!-- Горизонтальное расположение -->
+                <input type="text"
+                       class="form-control text-center"
+                       maxlength="1"
+                       style="width: 50px;"
+                       @bind="firstNumber"
+                       @oninput="(e) => CheckCode(e, 1)" />
+
+                <input type="text"
+                       class="form-control text-center"
+                       maxlength="1"
+                       style="width: 50px;"
+                       @bind="secondNumber"
+                       @oninput="(e) => CheckCode(e, 2)" />
+
+                <input type="text"
+                       class="form-control text-center"
+                       maxlength="1"
+                       style="width: 50px;"
+                       @bind="thirdNumber"
+                       @oninput="(e) => CheckCode(e, 3)" />
+
+                <input type="text"
+                       class="form-control text-center"
+                       maxlength="1"
+                       style="width: 50px;"
+                       @bind="fourthNumber"
+                       @oninput="(e) => CheckCode(e, 4)" />
+            </div>
+            <div class="form-group">
+                <p style="text-align: center; color:red;" hidden="@IsRight">Неправильный код</p>
+            </div>
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <Button Color="ButtonColor.Danger" @onclick="CloseModal">Отменить</Button>
+        <Button Color="ButtonColor.Success" @onclick="RepeatCode">Отправить другой код</Button>
+    </FooterTemplate>
+</Modal>
+
+@code {
+    private Modal? modal;
+    public string Title { get; set; } = "Подтверждение почты";
+    private string firstNumber { get; set; } = string.Empty;
+    private string secondNumber { get; set; } = string.Empty;
+    private string thirdNumber { get; set; } = string.Empty;
+    private string fourthNumber { get; set; } = string.Empty;
+    private bool IsRight { get; set; } = true;
+    private int countThisCode { get; set; }
+    private int repeatCount { get; set; }
+    private RegisterUser user { get; set; }
+    private string? token { get; set; }
+    private UserToken? userToken { get; set; }
+
+    public async Task ShowModal(RegisterUser user)
+    {
+        this.user = user;
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        token = authState.User.FindFirst(ClaimTypes.Sid)?.Value!;
+
+        using var client = new HttpClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var body = JsonContent.Create(new ApprovalAccount()
+        {
+            Login = user.Login,
+            Email = user.Email
+        });
+
+        await client.PostAsync($"{config["ServerApi:BaseUrl"]}/Authorization/SendCode", body);
+
+        await modal!.ShowAsync();
+    }
+
+    public async Task CloseModal()
+    {
+        await modal!.HideAsync();
+    }
+
+    public async Task CheckCode(ChangeEventArgs value, int code)
+    {
+        switch (code)
+        {
+            case 1:
+                firstNumber = value.Value.ToString().Length > 1 ? value.Value.ToString().Last().ToString() : value.Value.ToString();
+                StateHasChanged();
+                break;
+            case 2:
+                secondNumber = value.Value.ToString().Length > 1 ? value.Value.ToString().Last().ToString() : value.Value.ToString();
+                StateHasChanged();
+                break;
+            case 3:
+                thirdNumber = value.Value.ToString().Length > 1 ? value.Value.ToString().Last().ToString() : value.Value.ToString();
+                StateHasChanged();
+                break;
+            case 4:
+                fourthNumber = value.Value.ToString().Length > 1 ? value.Value.ToString().Last().ToString() : value.Value.ToString();
+                StateHasChanged();
+                break;
+        }
+
+        var result = string.Join("", firstNumber, secondNumber, thirdNumber, fourthNumber);
+
+        if (result.Length != 4)
+        {
+            return;
+        }
+
+        using var client = new HttpClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        user.Code = result;
+
+        var body = JsonContent.Create(user);
+        var response = await client.PostAsync($"{config["ServerApi:BaseUrl"]}/Authorization/Register", body);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            IsRight = false;
+            StateHasChanged();
+            return;
+        }
+
+        var userToken = JsonConvert.DeserializeObject<UserToken>(await response.Content.ReadAsStringAsync());
+
+        await SignIn(userToken!.Token);
+
+        await modal!.HideAsync();
+    }
+
+    public async Task RepeatCode()
+    {
+        using var client = new HttpClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var body = JsonContent.Create(new ApprovalAccount()
+            {
+                Login = user.Login,
+                Email = user.Email
+            });
+
+        await client.PostAsync($"{config["ServerApi:BaseUrl"]}/Authorization/SendCode", body);
+    }
+
+    private async Task SignIn(string tokenInput)
+    {
+        if (await TokenService.ValidateTokenAsync(tokenInput))
+        {
+            var userInfo = await TokenService.GetUserInfoAsync(tokenInput);
+
+            await ((CustomAuthStateProvider)AuthStateProvider).UpdateAuthenticationState(userInfo);
+
+            NavigationManager.NavigateTo("/", true);
+        }
+    }
+}

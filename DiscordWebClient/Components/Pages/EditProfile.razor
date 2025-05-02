@@ -1,0 +1,132 @@
+﻿@using System.Net.Http.Headers
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IConfiguration config
+
+<Modal @ref="modal" Title="@Title">
+    <BodyTemplate>
+        <div class="form-group">
+            <label>Загрузка фото</label>
+            <InputFile class="custom-file-input" accept="image/jpeg" OnChange="OnChange" id="inputFile" />
+            <img src="@imageUrl" class="img-preview" @ref="imageElement" />
+        </div>
+        <div class="form-group">
+            <label for="exampleInputEmail1">Email</label>
+            <input type="email" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" placeholder="Enter email" @bind="email">
+        </div>
+        <div class="form-group">
+            <label for="exampleInputEmail1">Логин</label>
+            <input type="text" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" placeholder="Enter email" @bind="login">
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <Button Color="ButtonColor.Danger" @onclick="CloseModal">Отменить</Button>
+        <Button Color="ButtonColor.Success" @onclick="Save">Сохранить изменения</Button>
+    </FooterTemplate>
+</Modal>
+
+@code {
+    public event Func<ChatDto, List<Guid>, Task>? ClosedModal;
+    private Modal? modal;
+    private string? imageUrl;
+    private ElementReference imageElement;
+    [Parameter]
+    public string Title { get; set; } = "Изменения профиля";
+    private string token;
+    IBrowserFile file;
+    private string? login;
+    private string? email;
+    public event Action<InfoUser> UpdateProfileHandler;
+
+    public async Task ShowModal()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        token = authState.User.FindFirst(ClaimTypes.Sid)?.Value!;
+
+        using var client = new HttpClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await client.GetAsync($"{config["ServerApi:BaseUrl"]}/User/GetUser");
+
+        var user = JsonConvert.DeserializeObject<InfoUser>((await response.Content.ReadAsStringAsync()));
+        login = user!.Login;
+        email = user!.Email;
+
+        await modal!.ShowAsync();
+    }
+
+    private async Task OnChange(InputFileChangeEventArgs e)
+    {
+        file = e.File;
+
+        if (file != null)
+        {
+            // Ресайз изображения перед загрузкой
+            var resizedImage = await file.RequestImageFileAsync(
+                "image/jpeg", // Формат вывода
+                800,          // Максимальная ширина
+                800);         // Максимальная высота
+
+
+            using var stream = resizedImage.OpenReadStream(maxAllowedSize: 2 * 1024 * 1024); 
+            using var memoryStream = new MemoryStream();
+            await stream.CopyToAsync(memoryStream);
+
+            imageUrl = $"data:image/jpeg;base64,{Convert.ToBase64String(memoryStream.ToArray())}";
+        }
+    }
+
+    private async void Save()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        token = authState.User.FindFirst(ClaimTypes.Sid)?.Value!;
+
+        using var client = new HttpClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        HttpResponseMessage? response;
+
+        InfoUser userUpdate = new InfoUser();
+
+        if (file != null)
+        {
+            using var content = new MultipartFormDataContent();
+            var streamContent = new StreamContent(file.OpenReadStream());
+            content.Add(streamContent, "file", file.Name);
+
+            response = await client.PostAsync($"{config["ServerApi:BaseUrl"]}/User/UpdatePicture", content);
+
+            userUpdate.PictureId = JsonConvert.DeserializeObject<Guid>((await response.Content.ReadAsStringAsync()));
+        }
+
+        var jsContent = JsonContent.Create(new UpdateUserDto()
+        {
+            Login = login,
+            Email = email
+        });
+
+        if (!string.IsNullOrEmpty(login) && !string.IsNullOrEmpty(email))
+        {
+            userUpdate.Login = login;
+            userUpdate.Email = email;
+
+            response = await client.PostAsync($"{config["ServerApi:BaseUrl"]}/User/UpdateProfile", jsContent);
+        }
+
+        await modal!.HideAsync();
+        UpdateProfileHandler.Invoke(userUpdate);
+    }
+
+    private async void CloseModal()
+    {
+        await modal!.HideAsync();
+    }
+}
+
+<style>
+    .img-preview {
+        max-width: 300px;
+        max-height: 300px;
+        margin-top: 15px;
+        border: 1px solid #ddd;
+    }
+</style>

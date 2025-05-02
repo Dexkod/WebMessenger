@@ -1,5 +1,4 @@
 ﻿using DiscordDomain.Enums;
-using System.ComponentModel.DataAnnotations;
 
 namespace ApplicationDiscord.Dto;
 
@@ -16,4 +15,5 @@ public record RegisterUser
     public string? MiddleName { get; set; } = null!;
     public Gender Gender { get; set; }
     public int Age { get; set; }
+    public string Code { get; set; } = null!;
 }

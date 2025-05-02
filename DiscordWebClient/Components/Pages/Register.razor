@@ -10,6 +10,11 @@
 @inject NavigationManager NavigationManager
 @inject TokenService TokenService
 @inject AuthenticationStateProvider AuthStateProvider
+@inject IConfiguration config
+
+<CodeApproval @ref="codeApproval">
+
+</CodeApproval>
 
 <div class="container register">
     <div class="row">
@@ -81,6 +86,7 @@
     string email = string.Empty;
     string phone = string.Empty;
     string age = string.Empty;
+    CodeApproval codeApproval;
 
     async void RegisterClick()
     {
@@ -96,7 +102,7 @@
             return;
         }
 
-        var body = JsonContent.Create(new RegisterUser()
+        var body = new RegisterUser()
         {
             Login = login,
             FirstName = firstName,
@@ -106,28 +112,9 @@
             Gender = isMale ? Gender.Man : Gender.Woman,
             Email = email,
             Phone = phone
-        });
+        };
 
-        using(var httpClient = new HttpClient())
-        {
-            var result = await httpClient.PostAsync("http://localhost:5237/api/Authorization/Register", body);
-
-            var token = JsonConvert.DeserializeObject<UserToken>(await result.Content.ReadAsStringAsync());
-
-            await SignIn(token!.Token);
-        }
-    }
-
-    private async Task SignIn(string tokenInput)
-    {
-        if (await TokenService.ValidateTokenAsync(tokenInput))
-        {
-            var userInfo = await TokenService.GetUserInfoAsync(tokenInput);
-
-            await ((CustomAuthStateProvider)AuthStateProvider).UpdateAuthenticationState(userInfo);
-
-            NavigationManager.NavigateTo("/", true);
-        }
+        await codeApproval.ShowModal(body);
     }
 
     void ChangeGender()

@@ -21,4 +21,5 @@ public record User : BaseEntity
     public List<Relationship>? Relationships { get; set; }
     public List<RelationshipGroup>? Groups { get; set; }
     public List<AuthorizationToken>? AuthorizationToken { get; set; }
+    public List<Notification>? Notifications { get; set; }
 }

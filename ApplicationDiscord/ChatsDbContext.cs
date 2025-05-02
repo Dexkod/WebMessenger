@@ -13,6 +13,7 @@ public class ChatsDbContext : DbContext
     public DbSet<HistoryMessage> HistoryMessages { get; set; }
     public DbSet<Relationship> Relationships { get; set; }
     public DbSet<RelationshipGroup> RelationshipGroups { get; set; }
+    public DbSet<Notification> Notifications { get; set; }
 
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)

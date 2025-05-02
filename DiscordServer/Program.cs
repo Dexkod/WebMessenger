@@ -1,10 +1,11 @@
 using ApplicationDiscord;
 using DiscordServer.Authentication;
 using DiscordServer.Chats;
+using DiscordServer.Services;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
+
 
 builder.Services.AddDbContext<ChatsDbContext>(
         o => o.UseNpgsql(builder.Configuration.GetConnectionString("ChatDb")));
@@ -21,6 +22,8 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddSignalR();
+
+builder.Services.AddScoped<EmailService>();
 
 var app = builder.Build();
 

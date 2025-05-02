@@ -5,6 +5,7 @@ using DiscordDomain.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Concurrent;
 using System.Security.Claims;
 
 namespace DiscordServer.Controllers;
@@ -44,7 +45,7 @@ public class ChatController : Controller
             })
             .Select(u => new ChatDto()
             {
-                Messages = u.HistoryMessages,
+                Messages = new ConcurrentQueue<HistoryMessage>(u.HistoryMessages),
                 PicturePath = $"/PictureStorage/{u.User!.PictureId}.jpg",
                 Name = u.User.Login,
                 RelationshipId = u.Id,
@@ -60,7 +61,7 @@ public class ChatController : Controller
             .Where(_ => _.Groups!.Select(_ => _.UserId).Contains(userId))
             .Select(_ => new ChatDto
             {
-                Messages = _.HistoryMessages,
+                Messages = new ConcurrentQueue<HistoryMessage>(_.HistoryMessages),
                 PicturePath = $"/PictureStorage/{_.PictureId}.jpg",
                 Name = _.Name,
                 RelationshipId = _.Id,

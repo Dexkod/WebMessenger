@@ -4,8 +4,11 @@
 @using Microsoft.AspNetCore.SignalR.Client;
 @using System.Net.Http.Headers
 @using DiscordDomain.Models
+@using System.Collections.Concurrent
 @attribute [StreamRendering]
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IJSRuntime js
+@inject IConfiguration config
 
 <CreateGroup @ref="createGroupmodal">
 
@@ -34,7 +37,7 @@
 
                     <div class="card mask-custom">
                         <div class="card-body">
-                        <div class="chat-container">
+                        <div class="chat-container-reverse">
                             <ul class="list-unstyled mb-0">
                                 <li class="p-2 border-bottom" style="border-bottom: 1px solid rgba(255,255,255,.3) !important;">
                                     <a class="d-flex justify-content-between link-light" @onclick="ShowModal">
@@ -105,7 +108,7 @@
                         }
                                 
                     </div>
-                    <div class="chat-container">
+                    <div id="scrollContainer" class="chat-container">
                     <ul class="list-unstyled text-white">
 
                         @if (focusChat == null || focusChat.Messages == null || focusChat.Messages.Count == 0)
@@ -156,7 +159,6 @@
                                 }
                             }
                         }
-
                         <div class="flex-container">
                             <input type="search" class="form-control rounded" placeholder="" aria-label="Search" aria-describedby="search-addon" @bind=message/>
                             <button type="button" data-mdb-button-init data-mdb-ripple-init class="btn btn-light btn-lg btn-rounded float-end" @onclick="@SendMessage">Send</button>
@@ -178,7 +180,7 @@
 {
     private bool IsAuthorized = false;
     private string token { get; set; }
-    private List<ChatDto> chats { get; set; }
+    private ConcurrentQueue<ChatDto> chats { get; set; }
     private ChatDto focusChat { get; set; }
     private Guid userId { get; set; }
     private string message { get; set; }
@@ -188,6 +190,8 @@
     private bool IsGetCall = false;
     private int typeCall = 0;
     private CreateGroup createGroupmodal;
+    private IJSObjectReference? _module;
+
 
     protected override async void OnInitialized()
     {
@@ -207,12 +211,12 @@
         {
             httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            var result = await httpClient.GetAsync("http://localhost:5237/api/Chat/GetAllMessage");
+            var result = await httpClient.GetAsync($"{config["ServerApi:BaseUrl"]}/Chat/GetAllMessage");
 
             if (result.IsSuccessStatusCode)
             {
-                chats = JsonConvert.DeserializeObject<List<ChatDto>>(await result.Content.ReadAsStringAsync())!;
-                chats = chats.OrderByDescending(_ => _.ModifiedTime).ToList();
+                var list = JsonConvert.DeserializeObject<List<ChatDto>>(await result.Content.ReadAsStringAsync())!;
+                chats = new ConcurrentQueue<ChatDto>(list.OrderByDescending(_ => _.ModifiedTime).ToList());
 
                 if (chats != null && chats.Count > 0)
                 {
@@ -230,7 +234,6 @@
         chatService.OnCreateChatReceived += OnCreateChatReceived;
 
         createGroupmodal.ClosedModal += HideModal;
-
         StateHasChanged();
     }
 
@@ -241,6 +244,10 @@
             NavigationManager.NavigateTo("/auth");
             return;
         }
+
+        _module = await js.InvokeAsync<IJSObjectReference>(
+            "import", "/PictureStorage/js/Chat.js");
+        await _module.InvokeVoidAsync("scrollToBottom");
 
         var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
 
@@ -293,18 +300,21 @@
             {
                 if (chat.Messages != null)
                 {
-                    chat.Messages.Add(historyMessage);
+                    chat.Messages.Enqueue(historyMessage);
                     chat.ModifiedTime = DateTime.Now;
                 }
                 else
                 {
-                    chat.Messages = new List<HistoryMessage>() { historyMessage };
+                    chat.Messages = new System.Collections.Concurrent.ConcurrentQueue<HistoryMessage>();
+                    chat.Messages.Enqueue(historyMessage);
                     chat.ModifiedTime = DateTime.Now;
                 }
 
-                chats = chats.OrderByDescending(_ => _.ModifiedTime).ToList();
+                var chatNew = new List<ChatDto>(chats.OrderByDescending(_ => _.ModifiedTime).ToList());
+
                 await InvokeAsync(() =>
                 {
+                    chats = new ConcurrentQueue<ChatDto>(chatNew);
                     this.StateHasChanged();
                 });
             }
@@ -357,8 +367,8 @@
 
     private async Task HideModal(ChatDto chat, List<Guid> userIds)
     {
-        chats.Add(chat);
-        chats = chats.OrderByDescending(_ => _.ModifiedTime).ToList();
+        chats.Enqueue(chat);
+        chats = new ConcurrentQueue<ChatDto>(chats.ToList().OrderByDescending(_ => _.ModifiedTime));
 
         await chatService.GetHub(userId).SendAsync("CreateChat", chat.Name, chat.PicturePath, userIds, chat.RelationshipId);
         StateHasChanged();
@@ -366,7 +376,7 @@
 
     private void OnCreateChatReceived(string name, string picturePath, Guid chatId)
     {
-        chats.Add(new ChatDto()
+        chats.Enqueue(new ChatDto()
         {
             RelationshipId = chatId,
             Name = name,
@@ -375,7 +385,7 @@
             IsGroup = true
         });
 
-        chats = chats.OrderByDescending(_ => _.ModifiedTime).ToList();
+        chats = new ConcurrentQueue<ChatDto>(chats.ToList().OrderByDescending(_ => _.ModifiedTime));
         InvokeAsync(StateHasChanged);
     }
 }
@@ -412,6 +422,12 @@
     }
 
     .chat-container {
+        max-height: 60vh;
+        overflow-y: auto;
+        padding-right: 10px;
+    }
+
+    .chat-container-reverse {
         max-height: 60vh;
         overflow-y: auto;
         padding-right: 10px;

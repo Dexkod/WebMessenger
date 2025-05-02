@@ -1,4 +1,7 @@
-﻿@inherits LayoutComponentBase
+﻿@using DiscordWebClient.Authentication
+@inherits LayoutComponentBase
+@inject NavigationManager NavigationManager
+@inject CustomAuthStateProvider AuthenticationStateProvider
 
 <div class="page">
     <div class="sidebar">
@@ -7,7 +10,7 @@
 
     <main>
         <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+            <a target="_blank" @onclick="SignOut">Выйти</a>
         </div>
 
         <article class="content px-4">
@@ -31,3 +34,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js" integrity="sha512-JPcRR8yFa8mmCsfrw4TNte1ZvF1e3+1SdGMslZvmrzDYxS69J7J49vkFL8u6u8PlPJK+H3voElBtUCzaXj+6ig==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 <script src="_content/Blazor.Bootstrap/blazor.bootstrap.js"></script>
+
+@code
+{
+    private async Task SignOut()
+    {
+        await AuthenticationStateProvider.DeleteAuthenticationState();
+        NavigationManager.NavigateTo("/auth", true);
+    }
+}

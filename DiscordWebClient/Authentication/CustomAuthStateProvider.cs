@@ -60,4 +60,11 @@ public class CustomAuthStateProvider : AuthenticationStateProvider
 
         NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(claimsPrincipal)));
     }
+
+    public async Task DeleteAuthenticationState()
+    {
+        await _sessionStorage.DeleteAsync("UserSession");
+
+        NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(_anonymous)));
+    }
 }

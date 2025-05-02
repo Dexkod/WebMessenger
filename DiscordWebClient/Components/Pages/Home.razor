@@ -4,6 +4,11 @@
 @inject NavigationManager NavigationManager
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject ChatService chatService
+@inject IConfiguration config
+
+<EditProfile @ref="editProfile">
+
+</EditProfile>
 
 <AuthorizeView>
 <Authorized>
@@ -24,7 +29,7 @@
                                 <h5>@user.LastName @user.FirstName @user.MiddleName</h5>
                             </div>
                         </div>
-                        <button type="button" data-mdb-button-init data-mdb-ripple-init class="btn btn-outline-dark text-body" data-mdb-ripple-color="dark" style="z-index: 1; height: 50px;">
+                        <button type="button" @onclick="ShowEditProfie" data-mdb-button-init data-mdb-ripple-init class="btn btn-outline-dark text-body" data-mdb-ripple-color="dark" style="z-index: 1; height: 50px;">
                             Edit profile
                         </button>
                         @* <div class="p-4 text-black bg-body-tertiary">
@@ -97,6 +102,7 @@
     private InfoUser user { get; set; }
     private string pathPicture { get; set; }
     private bool IsAuthorized { get; set; } = false;
+    private EditProfile editProfile;
 
     protected override async void OnInitialized()
     {
@@ -114,7 +120,7 @@
         {
             httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            var result = await httpClient.GetAsync("http://localhost:5237/api/User/GetUser");
+            var result = await httpClient.GetAsync($"{config["ServerApi:BaseUrl"]}/User/GetUser");
 
             if (result.IsSuccessStatusCode)
             {
@@ -123,6 +129,8 @@
                 StateHasChanged();
             }
         }
+
+        editProfile.UpdateProfileHandler += UpdateProfile;
 
         var hub = chatService.GetHub(user.Id);
         await chatService.StartHub(hub, user.Id);
@@ -136,6 +144,23 @@
         }
 
         await base.OnAfterRenderAsync(firstRender);
+    }
+
+    private async Task ShowEditProfie()
+    {
+        await editProfile.ShowModal();
+    }
+
+    private void UpdateProfile(InfoUser updateUser)
+    {
+        if (updateUser.PictureId != Guid.Empty)
+        {
+            pathPicture = $"/PictureStorage/{updateUser.PictureId}.jpg";
+        }
+
+        user.Login = updateUser.Login;
+        user.Email = updateUser.Email;
+        StateHasChanged();
     }
 }
 
