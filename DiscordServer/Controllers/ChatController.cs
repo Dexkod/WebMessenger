@@ -120,7 +120,7 @@ public class ChatController : Controller
 
         _context.Groups.Add(groupDb);
         _context.RelationshipGroups.AddRange(list);
-        //await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync();
 
         return Ok(groupDb.Id);
     }

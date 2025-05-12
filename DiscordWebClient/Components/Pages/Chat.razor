@@ -16,11 +16,13 @@
 
 <Modal @ref="modal" Title="Звонок">
     <BodyTemplate>
-        
+        <div style="margin-bottom: 20px">
+            <p style="margin-bottom: 10px">@inputValue</p>
+        </div>
     </BodyTemplate>
     <FooterTemplate>
-        <Button Color="ButtonColor.Danger" hidden="@IsGetCall" @onclick="UnTakeOffer">Закрыть</Button>
-        <Button Color="ButtonColor.Success" hidden="@IsGetCall" @onclick="TakeOffer">Сохранить</Button>
+        <Button Color="ButtonColor.Danger" hidden="@IsGetCall" @onclick="UnTakeOffer">Отменить</Button>
+        <Button Color="ButtonColor.Success" hidden="@IsGetCall" @onclick="TakeOffer">Принять</Button>
     </FooterTemplate>
 </Modal>
 
@@ -268,12 +270,19 @@
 
     private async void SendMessage()
     {
-        if (focusChat != null && !string.IsNullOrEmpty(message))
+        try
         {
-            var hub = chatService.GetHub(userId);
-            await hub.InvokeAsync("Send", message, userId, focusChat.RelationshipId);
-            message = string.Empty;
-            await InvokeAsync(StateHasChanged);
+            if (focusChat != null && !string.IsNullOrEmpty(message))
+            {
+                var hub = chatService.GetHub(userId);
+                await hub.InvokeAsync("Send", message, userId, focusChat.RelationshipId);
+                message = string.Empty;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        finally
+        {
+            
         }
     }
 
@@ -391,13 +400,10 @@
 }
 
 <style>
-    .gradient-custom {
-        /* fallback for old browsers */
-        background: #fccb90;
-        /* Chrome 10-25, Safari 5.1-6 */
-        background: -webkit-linear-gradient(to bottom right, rgba(252, 203, 144, 1), rgba(213, 126, 235, 1));
-        /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
-        background: linear-gradient(to bottom right, rgba(252, 203, 144, 1), rgba(213, 126, 235, 1))
+    .gradient-custom{
+        background: #1E213D;
+        background: -webkit-linear-gradient(to right, #2A2D5A, #1A1C37);
+        background: linear-gradient(to right, #2A2D5A, #1A1C37);
     }
     .flex-container {
         display: flex;

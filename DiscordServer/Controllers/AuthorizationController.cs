@@ -45,7 +45,7 @@ public class AuthorizationController : ControllerBase
 
         if (userToken == null)
         {
-            BadRequest();
+            return BadRequest();
         }
 
         return Ok(userToken);

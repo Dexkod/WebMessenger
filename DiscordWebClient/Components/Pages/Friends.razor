@@ -8,6 +8,7 @@
 
 <AuthorizeView>
 <Authorized>
+<div class="h-100 gradient-custom-2">
 <div style="display: flex; justify-content: center; align-items: center;">
     <p>Поиск друзей</p>
 </div>
@@ -23,12 +24,12 @@
 {
     foreach(var friend in friends)
     {
-        var color = friend.IsFriend ? "#32CD32" : "#8FBC8F";
+        var color = friend.IsFriend ? "#3A3F6F" : "#5A5F9F" ;
         <section class="w-100 px-4 py-5" style="background-color: @color; border-radius: .5rem .5rem 0 0; margin-bottom: 10px;">
-            <div class="row d-flex justify-content-center">
+            <div class="row d-flex justify-content-left">
                 <div class="col col-md-9 col-lg-7 col-xl-6">
                     <div class="card" style="border-radius: 15px;">
-                        <div class="card-body p-4">
+                        <div class="card-body p-1">
                             <div class="d-flex">
                                 <div class="flex-shrink-0">
                                     <img src="@string.Concat("/PictureStorage/", friend.PictureId.ToString(), ".jpg")"
@@ -67,6 +68,7 @@
         </section>
     }
  }
+ </div>
  </Authorized>
 </AuthorizeView>
 
@@ -101,7 +103,7 @@
             friends = new List<InfoFriends>();
             await GetFriends(null);
             await GetOtherPeople(null);
-            friends = friends.OrderBy(_ => _.Login).ToList();
+            friends = friends.OrderByDescending(_ => _.IsFriend).ThenBy(_ => _.Login).ToList();
             StateHasChanged();
         }
 
@@ -218,3 +220,14 @@
         }
     }
 }
+
+<style>
+    .gradient-custom-2 {
+        /* Основной цвет #1E213D в градиенте */
+        background: #1E213D;
+        background: -webkit-linear-gradient(to right, #2A2D5A, #1A1C37);
+        background: linear-gradient(to right, #2A2D5A, #1A1C37);
+        /* Альтернативный вариант с более выраженным градиентом */
+        /* background: linear-gradient(135deg, #1E213D 0%, #3A3F6F 50%, #1E213D 100%); */
+    }
+</style>

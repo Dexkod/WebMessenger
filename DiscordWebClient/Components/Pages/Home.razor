@@ -6,15 +6,19 @@
 @inject ChatService chatService
 @inject IConfiguration config
 
-<EditProfile @ref="editProfile">
 
-</EditProfile>
+
 
 <AuthorizeView>
 <Authorized>
+
+<div class="h-100 gradient-custom-2">
+<EditProfile @ref="editProfile">
+
+</EditProfile>
 @if(user != null)
 {
-    <section class="h-100 gradient-custom-2">
+
         <div class="container py-5 h-100">
             <div class="row d-flex justify-content-center">
                 <div class="col col-lg-9 col-xl-8">
@@ -91,8 +95,8 @@
                 </div>
             </div>
         </div>
-    </section>
 }
+</div>
 </Authorized>
 </AuthorizeView>
 
@@ -166,8 +170,11 @@
 
 <style>
     .gradient-custom-2 {
-        background: #fbc2eb;
-        background: -webkit-linear-gradient(to right, rgba(251, 194, 235, 1), rgba(166, 193, 238, 1));
-        background: linear-gradient(to right, rgba(251, 194, 235, 1), rgba(166, 193, 238, 1))
+        /* Основной цвет #1E213D в градиенте */
+        background: #1E213D;
+        background: -webkit-linear-gradient(to right, #2A2D5A, #1A1C37);
+        background: linear-gradient(to right, #2A2D5A, #1A1C37);
+        /* Альтернативный вариант с более выраженным градиентом */
+        /* background: linear-gradient(135deg, #1E213D 0%, #3A3F6F 50%, #1E213D 100%); */
     }
 </style>

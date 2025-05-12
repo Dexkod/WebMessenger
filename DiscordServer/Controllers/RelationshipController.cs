@@ -72,7 +72,7 @@ public class RelationshipController : Controller
 
         var mapper = MapperConfig.InitializeAutomapper();
 
-        return Ok(friendsDb.Select(_ => mapper.Map<User, InfoFriends>(_)));
+        return Ok(friendsDb.Select(_ => mapper.Map<User, InfoFriends>(_)).Where(_ => _.Login != null && _.Login.Contains(login)));
     }
 
     [Authorize]
@@ -90,7 +90,7 @@ public class RelationshipController : Controller
 
         var mapper = MapperConfig.InitializeAutomapper();
 
-        return Ok(otherPeople.Select(_ => mapper.Map<User, InfoFriends>(_)));
+        return Ok(otherPeople.Select(_ => mapper.Map<User, InfoFriends>(_)).Where(_ => _.Login != null && _.Login.Contains(login)));
     }
 
     [Authorize]

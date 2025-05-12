@@ -25,11 +25,18 @@ public class ChatService
             .WithAutomaticReconnect()
             .Build();
 
-        hub.On<string, Guid, Guid, HistoryMessage>("Receive", async (a, b, d, e) => await OnMessageReceived?.Invoke(a, b, d, e));
-        hub.On<Guid, Guid, int>("OfferCall", async (a, b, c) => await OnOfferCallReceived?.Invoke(a, b, c));
-        hub.On<string>("GetCall", (a) => OnGetCallReceived?.Invoke(a));
-        hub.On("UnTakeOffer", async () => await  OnUnTakeOfferReceived?.Invoke());
-        hub.On<string, string, Guid>("CreateChat", (a, b, c) => OnCreateChatReceived?.Invoke(a, b, c));
+        try
+        {
+            hub.On<string, Guid, Guid, HistoryMessage>("Receive", async (a, b, d, e) => await OnMessageReceived?.Invoke(a, b, d, e));
+            hub.On<Guid, Guid, int>("OfferCall", async (a, b, c) => await OnOfferCallReceived?.Invoke(a, b, c));
+            hub.On<string>("GetCall", (a) => OnGetCallReceived?.Invoke(a));
+            hub.On("UnTakeOffer", async () => await OnUnTakeOfferReceived?.Invoke());
+            hub.On<string, string, Guid>("CreateChat", (a, b, c) => OnCreateChatReceived?.Invoke(a, b, c));
+        }
+        finally
+        {
+
+        }
 
         return hub;
     }

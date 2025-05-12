@@ -97,7 +97,7 @@ public class ChatHub : Hub
         }
         await Clients.Clients(connections).SendAsync("Receive", message, userId, chatId, historyMessage);
         _context.HistoryMessages.Add(historyMessage);
-        //await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync();
     }
 
     public async Task OfferCall(Guid chatId, Guid senderId, int typeCall)

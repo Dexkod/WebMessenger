@@ -38,9 +38,12 @@
               placeholder="Enter password" @bind-value="@Password"/>
             <label class="form-label" for="form3Example4">Password</label>
           </div>
+          
+          <div class="form-group">
+            <p style="text-align: center; color:red;" hidden="@IsRight">Неправильный логин или пароль</p>
+          </div>
 
           <div class="d-flex justify-content-between align-items-center">
-            <!-- Checkbox -->
             <div class="form-check mb-0">
               <input class="form-check-input me-2" type="checkbox" value="" id="form2Example3" />
               <label class="form-check-label" for="form2Example3">
@@ -85,6 +88,9 @@ height: calc(100% - 73px);
     [Parameter]
     public string Password { get; set; } = "";
 
+    private bool IsRight { get; set; } = true;
+
+
     async void LoginClick()
     {
         using(var httpClient = new HttpClient())
@@ -96,6 +102,13 @@ height: calc(100% - 73px);
             });
 
             var result = await httpClient.PostAsync($"{config["ServerApi:BaseUrl"]}/Authorization/SignIn", body);
+
+            if (!result.IsSuccessStatusCode)
+            {
+                IsRight = false;
+                return;
+            }
+
             var token = JsonConvert.DeserializeObject<UserToken>(await result.Content.ReadAsStringAsync());
 
             await SignIn(token!.Token);

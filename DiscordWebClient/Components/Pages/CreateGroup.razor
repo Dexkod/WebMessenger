@@ -55,7 +55,7 @@
 
         if (!string.IsNullOrEmpty(login))
         {
-            query.Add("login", login);
+            query.Add("", login);
         }
 
         using var httpClient = new HttpClient();

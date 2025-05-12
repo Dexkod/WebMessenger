@@ -7,7 +7,7 @@
 
 <PageTitle>WebRtc</PageTitle>
 
-
+<div class="h-100 gradient-custom-2">
 @if(typeCall == 2)
 {
     <div class="container">
@@ -38,6 +38,7 @@ else
         </div>
     </div>
 }
+</div>
 
 
 
@@ -109,3 +110,11 @@ else
         NavigationManager.NavigateTo("/chat");
     }
 }
+
+<style>
+    .gradient-custom-2 {
+        background: #1E213D;
+        background: -webkit-linear-gradient(to right, #2A2D5A, #1A1C37);
+        background: linear-gradient(to right, #2A2D5A, #1A1C37);
+    }
+</style>
